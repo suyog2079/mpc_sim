@@ -39,51 +39,60 @@ class Robot:
             [1, 0, 0, dt, 0, 0, 1/2 * dt**2, 0],
             [0, 1, 0, 0, dt, 0, 0, 1/2 * dt**2],
             [0, 0, 1, 0, 0, dt, 0, 0],
-            [0, 0, 0, 1, 0, 0, dt, 0],
-            [0, 0, 0, 0, 1, 0 ,0, dt],
-            [0, 0, 0, 0, 0, 1, 0, 0],
+            [0, 0, 0, 0, 0, 0, dt, 0],
+            [0, 0, 0, 0, 0, 0 ,0, dt],
+            [0, 0, 0, 0, 0, 0, 0, 0],
             [0, 0, 0, 0, 0, 0, 1, 0],
             [0, 0, 0, 0, 0, 0, 0, 1]
                       ])
 
         # defining control input matrix
         B = np.array([
-            [0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 1, 0, 0, 0, 0],
-            [0, 0, 0, 0, 1, 0, 0, 0],
-            [0, 0, 0, 0, 0, 1, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0],
+            [ 0, 0, 0],
+            [ 0, 0, 0],
+            [ 0, 0, 0],
+            [ 1, 0, 0],
+            [ 0, 1, 0],
+            [ 0, 0, 1],
+            [ 0, 0, 0],
+            [ 0, 0, 0],
             ])
 
+        # implement acceleration limits 
         self.state = A @ self.state + B @ input
+        self.state[3] = acceleration_limit(self.state[3], self.prev_state[3], dt)
+        self.state[4] = acceleration_limit(self.state[4], self.prev_state[4], dt)
+        self.state[5] = yaw_acceleration_limit(self.state[5], self.prev_state[5], dt)
+
+        # implement angle wrap for yaw
+        self.state[2] = angle_wrap(self.state[2])
+
+        self.prev_state = self.state.copy()
 
 
 # I have introduced some gaussian noise
     def observe(self):
-        noise = np.random.multivariate_normal(np.zeros(8), np.diag([0.01, 0.01, 0.001, 0.01,0.01, 0.001, 0.001, 0.001]), size=1).flatten()
+        noise = np.random.multivariate_normal(np.zeros(8), np.diag([0.01, 0.01, 0.001, 0.01, 0.01, 0.001, 0.001, 0.001]), size=1).flatten()
         observation = self.state + noise
 
         return observation 
 
 
-xs, ys = [], []
-robot = Robot(np.zeros(8))
-for i in range(100):
-    robot.update(np.array([0.0, 2.0, 0], dtype=float), 0.1)
-    observation = robot.observe()
-
-    print(observation)
-    # xs.append(observation[0])
-    # ys.append(observation[1])
-    xs.append(i)
-    ys.append(observation[4])
-plt.figure()
-plt.plot(xs, ys, '-o')
-plt.xlabel("x")
-plt.ylabel("y")
-plt.axis("equal")
-plt.grid(True)
-plt.show()
+# xs, ys = [], []
+# robot = Robot(np.zeros(8))
+# for i in range(100):
+#     robot.update(np.array([0.0, 2.0, 0], dtype=float), 0.1)
+#     observation = robot.observe()
+#
+#     print(observation)
+#     xs.append(observation[0])
+#     ys.append(observation[1])
+#     # xs.append(i)
+#     # ys.append(observation[4])
+# plt.figure()
+# plt.plot(xs, ys, '-o')
+# plt.xlabel("x")
+# plt.ylabel("y")
+# plt.axis("equal")
+# plt.grid(True)
+# plt.show()
