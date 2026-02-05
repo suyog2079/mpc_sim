@@ -31,7 +31,7 @@ class Robot:
     def update(self, input):
 
         # adding noise to the input
-        noise = np.random.multivariate_normal(np.zeros(3), np.diag([0.1, 0.1, 0.001]), size=1).flatten()
+        noise = np.random.multivariate_normal(np.zeros(3), np.diag([0.01, 0.01, 0.001]), size=1).flatten()
         input = input + noise
 
 
@@ -40,8 +40,8 @@ class Robot:
             [1, 0, 0, DT, 0, 0, 1/2 * DT**2, 0],
             [0, 1, 0, 0, DT, 0, 0, 1/2 * DT**2],
             [0, 0, 1, 0, 0, DT, 0, 0],
-            [0, 0, 0, 0, 0, 0, DT, 0],
-            [0, 0, 0, 0, 0, 0 ,0, DT],
+            [0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0 ,0, 0],
             [0, 0, 0, 0, 0, 0, 0, 0],
             [0, 0, 0, 0, 0, 0, 1, 0],
             [0, 0, 0, 0, 0, 0, 0, 1]
@@ -61,9 +61,9 @@ class Robot:
 
         # implement acceleration limits 
         self.X = A @ self.X + B @ input
-        self.X[3] = acceleration_limit(self.X[3], self.prev_X[3])
-        self.X[4] = acceleration_limit(self.X[4], self.prev_X[4])
-        self.X[5] = yaw_acceleration_limit(self.X[5], self.prev_X[5])
+        # self.X[3] = acceleration_limit(self.X[3], self.prev_X[3])
+        # self.X[4] = acceleration_limit(self.X[4], self.prev_X[4])
+        # self.X[5] = yaw_acceleration_limit(self.X[5], self.prev_X[5])
 
         # implement angle wrap for yaw
         self.X[2] = angle_wrap(self.X[2])

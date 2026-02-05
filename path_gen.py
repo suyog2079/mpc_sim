@@ -2,16 +2,26 @@ import matplotlib.pyplot as plt
 import numpy as np
 import matplotlib.patches as patches
 
-def f(x):
-    return (0.04 * x**3 - 0.8 * x**2 + 3 * x + 30)/6
+def curvature(s):
+    return (
+        0.05                       # baseline bend
+        + 0.02 * np.sin(0.5 * s)*s**2   # smooth oscillation
+        + 0.01 * np.sin(2.0 * s)*s   # tighter wiggles
+    )
 
+def generate_path_curvature(x, y, N=150, ds=0.1):
+    path = []
+    theta = 0.0
 
-def generate_path(start, num_points):
-    path = np.zeros((num_points, 2))
-    x = np.linspace(start, start + 10, num_points)
-    y = f(x)
+    for i in range(N):
+        kappa = curvature(i * ds)
+        theta += kappa * ds
+        x += np.cos(theta) * ds
+        y += np.sin(theta) * ds
+        path.append([x, y])
 
-    return np.vstack((x, y)).T
+    return np.array(path)
+
 
 def plot_path(path):
 
@@ -39,6 +49,5 @@ def plot_path(path):
 
 if __name__ == "__main__":
     start = 2 
-    num_points = 100
-    path = generate_path(start, num_points)
+    path = generate_path_curvature(1,1)
     plot_path(path)

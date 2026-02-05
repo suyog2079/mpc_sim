@@ -1,25 +1,26 @@
 import numpy as np
 
-class MPCController:
-    def __init__(self, _p, _m, _A,  _B, _C, _Q, _R):
+class MPC_Controller:
+    def __init__(self, _p, _m, _A,  _B, _C, _Qu, _Ru):
         """
         initialize MPC controller.
         Args:
-            _p (): predistion horizon
-            _m (): conrol horizon
+            _p (): prediction horizon
+            _m (): control horizon
             _dt (): time step
             _A (): state transition matrix
             _B (): input matrix 
             _C (): observation matrix
-            _path (): path to follow
+            _Qu (): single step stae penelty 
+            _Ru (): single step input penalty
         """
         self.p = _p
         self.m = _m
         self.A = _A
         self.B = _B
         self.C = _C
-        self.Q = _Q
-        self.R = _R
+        self.Q = np.kron(np.eye(self.p),_Qu)
+        self.R = np.kron(np.eye(self.m),_Ru)
 
     def Sx(self):
         """
