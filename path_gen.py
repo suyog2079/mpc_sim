@@ -1,9 +1,9 @@
 import matplotlib.pyplot as plt
+import numpy as np
 import matplotlib.patches as patches
 
 def f(x):
     return (0.04 * x**3 - 0.8 * x**2 + 3 * x + 30)/6
-
 
 
 def generate_path(start, num_points):
@@ -17,7 +17,7 @@ def plot_path(path):
 
     fig, ax = plt.subplots()
 
-    ax.plot(path[:, 0], path[:, 1], '-o')
+    ax.plot(path[:, 0], path[:, 1], '-b')
 
     box = patches.Rectangle((0, 0),
                             15, 8,
