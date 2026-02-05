@@ -88,7 +88,7 @@ CB+CAB+CA^2B & CB + CAB &  CB  & \dots & 0 \\
 
 The MPC objective function:
 
-$$ \arg\underset{\Delta U}\min J=(R_{s}-Y_{p})^TQ(R_{s}-Y_{p}) + \Delta U^TR\Delta U$$
+$$ \underset{\Delta U}{argmin} J=(R_{s}-Y_{p})^TQ(R_{s}-Y_{p}) + \Delta U^TR\Delta U$$
 
 
 $Y_{p}(k+1)=S^XX(k) + S^U_{pre} U(k-1)+S^U \Delta U_m(k)$
@@ -99,7 +99,7 @@ $Y = F + S^U \Delta U$
 
 substituting to the cost function:
 $$\begin{align}
-\arg\underset{\Delta U}\min J &= (R_{s}-Y_{p})^TQ(R_{s}-Y_{p}) + \Delta U^TR\Delta U \\
+\underset{\Delta U}{argmin} J &= (R_{s}-Y_{p})^TQ(R_{s}-Y_{p}) + \Delta U^TR\Delta U \\
 &= (R_{s}-(F+S^U\Delta U))^TQ(R_{s}-(F+S^U\Delta U)) + \Delta U^TR\Delta U
 \end{align}$$
 
