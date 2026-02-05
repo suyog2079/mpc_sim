@@ -1,13 +1,7 @@
 import numpy as np
-import path_gen
-import robot
-
-DT = 0.1
-P = 20
-M = 10
 
 class MPCController:
-    def __init__(self, _p, _m, _dt, _A, _B, _C, _Q, _R, _robot, _path):
+    def __init__(self, _p, _m, _A,  _B, _C, _Q, _R):
         """
         initialize MPC controller.
         Args:
@@ -17,17 +11,13 @@ class MPCController:
             _A (): state transition matrix
             _B (): input matrix 
             _C (): observation matrix
-            _robot (): robot instance
             _path (): path to follow
         """
         self.p = _p
         self.m = _m
-        self.dt = _dt
         self.A = _A
         self.B = _B
         self.C = _C
-        self.robot = _robot
-        self.path = _path
         self.Q = _Q
         self.R = _R
 
@@ -35,8 +25,9 @@ class MPCController:
         """
         Returns: Sx matrix which represents the effect of the current state on future outputs.
         """
-        ns = self.robot.X.shape[0]
+        # nos = number of states , nu = number of control inputs
         nos = self.C.shape[0]
+        ns = self.A.shape[0]
 
         Sx = np.zeros((self.p * nos, ns))
 
@@ -50,6 +41,7 @@ class MPCController:
         """
         Returns: Su_pre matrix which represents the effect of future control inputs on future outputs.
         """
+        # nos = number of states , nu = number of control inputs
         nos = self.C.shape[0]
         nu = self.B.shape[1]
 
@@ -59,14 +51,17 @@ class MPCController:
         X = self.B
 
         for i in range(self.p):
-            S = self.C @ X
+            S = S + self.C @ X
             Su_pre[i * nos:(i + 1) * nos, :] = S
             X = self.A @ X
+
+        return Su_pre
 
     def Su(self):
         """
         Returns: Su matrix which represents the effect of future control inputs on future outputs.
         """
+        # nos = number of states , nu = number of control inputs
         nos = self.C.shape[0]
         nu = self.B.shape[1]
 
@@ -79,7 +74,7 @@ class MPCController:
                     Su[row * nos:(row + 1) * nos, col * nu:(col + 1) * nu] = S
         return Su
 
-    def free_response(self, X_k, U_k_prev):
+    def F(self, X_k, U_k_prev):
         """
         Args:
             X_k (): Current state from observer
@@ -94,15 +89,37 @@ class MPCController:
         F = Sx @ X_k + Su_pre @ U_k_prev
         return F
 
-    def compute_delta_U(self, F, Y_ref):
+    def delta_U(self,F, Y_ref):
         """
         Args:
-            F (): free response vector
             Y_ref (): reference output vector
 
         Returns: optimal change in control input vector delta_U which minimizes the cost function J = ||F + Su * delta_U - Y_ref||^2
         """
         Su = self.Su()
-        delta_U = np.linalg.inv(Su.T @ self.Q @ Su + self.R) @ (Su.T @ self.Q @ (Y_ref - F))
+
+        H = Su.T @ self.Q @ Su + self.R
+        f = Su.T @ self.Q @ (Y_ref - F)
+        delta_U = np.linalg.solve(H, f)
         return delta_U
+
+    def control_output(self, X_k, U_k_prev, Y_ref):
+        """
+        Args:
+            X_k: current state estimate
+            U_k_prev: previous input (m,)
+            Y_ref: reference output over horizon (p*n,)
+    
+        Returns:
+            U_k: optimal control input at time k
+        """
+        F = self.F(X_k, U_k_prev)  # C.shape[0] * p         
+        delta_U = self.delta_U(F, Y_ref)   
+    
+        m = self.B.shape[1]
+
+        delta_u_k = delta_U[:m]
+    
+        U_k = U_k_prev + delta_u_k
+        return U_k
 
