@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 MAX_ACC = 2 
 MAX_YAW_ACC = 0.1
 DT = 0.1
+NUM_STATES = 6
+NUM_INPUTS = 3
 
 def acceleration_limit(vel, prev_vel):
     acc = (vel - prev_vel) / DT
@@ -36,16 +38,38 @@ class Robot:
 
 
         # defining state transition matrix 
+        # A = np.array([
+        #     [1, 0, 0, DT, 0, 0, 1/2 * DT**2, 0],
+        #     [0, 1, 0, 0, DT, 0, 0, 1/2 * DT**2],
+        #     [0, 0, 1, 0, 0, DT, 0, 0],
+        #     [0, 0, 0, 1, 0, 0, DT, 0],
+        #     [0, 0, 0, 0, 1, 0 ,0, DT],
+        #     [0, 0, 0, 0, 0, 1, 0, 0],
+        #     [0, 0, 0, 0, 0, 0, 1, 0],
+        #     [0, 0, 0, 0, 0, 0, 0, 1]
+        #               ])
+        #
+        # # defining control input matrix
+        # B = np.array([
+        #     [ 0, 0, 0],
+        #     [ 0, 0, 0],
+        #     [ 0, 0, 0],
+        #     [ 1, 0, 0],
+        #     [ 0, 1, 0],
+        #     [ 0, 0, 1],
+        #     [ 0, 0, 0],
+        #     [ 0, 0, 0],
+        #     ])
+
+        # defining state transition matrix 
         A = np.array([
-            [1, 0, 0, DT, 0, 0, 1/2 * DT**2, 0],
-            [0, 1, 0, 0, DT, 0, 0, 1/2 * DT**2],
-            [0, 0, 1, 0, 0, DT, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0 ,0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 1, 0],
-            [0, 0, 0, 0, 0, 0, 0, 1]
-                      ])
+            [1, 0, 0, DT, 0, 0],
+            [0, 1, 0, 0, DT, 0],
+            [0, 0, 1, 0, 0, DT],
+            [0, 0, 0, 1, 0, 0],
+            [0, 0, 0, 0, 1, 0],
+            [0, 0, 0, 0, 0, 1]
+            ])
 
         # defining control input matrix
         B = np.array([
@@ -54,16 +78,14 @@ class Robot:
             [ 0, 0, 0],
             [ 1, 0, 0],
             [ 0, 1, 0],
-            [ 0, 0, 1],
-            [ 0, 0, 0],
-            [ 0, 0, 0],
+            [ 0, 0, 1]
             ])
 
         # implement acceleration limits 
         self.X = A @ self.X + B @ input
-        # self.X[3] = acceleration_limit(self.X[3], self.prev_X[3])
-        # self.X[4] = acceleration_limit(self.X[4], self.prev_X[4])
-        # self.X[5] = yaw_acceleration_limit(self.X[5], self.prev_X[5])
+        self.X[3] = acceleration_limit(self.X[3], self.prev_X[3])
+        self.X[4] = acceleration_limit(self.X[4], self.prev_X[4])
+        self.X[5] = yaw_acceleration_limit(self.X[5], self.prev_X[5])
 
         # implement angle wrap for yaw
         self.X[2] = angle_wrap(self.X[2])
@@ -73,7 +95,8 @@ class Robot:
 
 # I have introduced some gaussian noise
     def observe(self):
-        noise = np.random.multivariate_normal(np.zeros(8), np.diag([0.01, 0.01, 0.001, 0.01, 0.01, 0.001, 0.001, 0.001]), size=1).flatten()
+        # noise = np.random.multivariate_normal(np.zeros(8), np.diag([0.01, 0.01, 0.001, 0.01, 0.01, 0.001, 0.001, 0.001]), size=1).flatten()
+        noise = np.random.multivariate_normal(np.zeros(NUM_STATES), np.diag([0.01, 0.01, 0.001, 0.01, 0.01, 0.001]), size=1).flatten()
         observation = self.X + noise
 
         return observation 

@@ -2,12 +2,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from path_gen import generate_path_curvature, plot_path
-from robot import Robot, DT
+from robot import Robot, DT, NUM_STATES
 from controller import MPC_Controller
 
-# -----------------------------
-# Reference trajectory generation
-# -----------------------------
+def align_ref(X_log, X_ref):
+    T = X_log.shape[0]
+    return X_ref[:T]
+
 
 def build_reference_from_path(path, v_avg=2.0):
     """
@@ -24,6 +25,7 @@ def build_reference_from_path(path, v_avg=2.0):
 
     # Tangent direction
     theta = np.arctan2(dy, dx)
+    np.unwrap(theta)
 
     # Velocity components
     vx = v_avg * dx / ds
@@ -37,15 +39,15 @@ def build_reference_from_path(path, v_avg=2.0):
     ax = np.gradient(vx) / DT
     ay = np.gradient(vy) / DT
 
-    X_ref = np.zeros((N, 8))
+    X_ref = np.zeros((N, NUM_STATES))
     X_ref[:, 0] = path[:, 0]
     X_ref[:, 1] = path[:, 1]
     X_ref[:, 2] = theta
     X_ref[:, 3] = vx
     X_ref[:, 4] = vy
     X_ref[:, 5] = omega
-    X_ref[:, 6] = ax
-    X_ref[:, 7] = ay
+    # X_ref[:, 6] = ax
+    # X_ref[:, 7] = ay
 
     return X_ref
 
@@ -79,41 +81,40 @@ if __name__ == "__main__":
     X_ref = interpolate_reference(X_ref, factor=4)
 
     # MPC parameters
-    p = 10
-    m = 5
+    p = 20
+    m = 10 
 
+    # defining state transition matrix 
     A = np.array([
-        [1, 0, 0, DT, 0, 0, 0.5 * DT**2, 0],
-        [0, 1, 0, 0, DT, 0, 0, 0.5 * DT**2],
-        [0, 0, 1, 0, 0, DT, 0, 0],
-        [0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 1, 0],
-        [0, 0, 0, 0, 0, 0, 0, 1],
-    ])
+        [1, 0, 0, DT, 0, 0],
+        [0, 1, 0, 0, DT, 0],
+        [0, 0, 1, 0, 0, DT],
+        [0, 0, 0, 1, 0, 0],
+        [0, 0, 0, 0, 1, 0],
+        [0, 0, 0, 0, 0, 1]
+        ])
 
+    # defining control input matrix
     B = np.array([
-        [0, 0, 0],
-        [0, 0, 0],
-        [0, 0, 0],
-        [1, 0, 0],
-        [0, 1, 0],
-        [0, 0, 1],
-        [0, 0, 0],
-        [0, 0, 0],
-    ])
+        [ 0, 0, 0],
+        [ 0, 0, 0],
+        [ 0, 0, 0],
+        [ 1, 0, 0],
+        [ 0, 1, 0],
+        [ 0, 0, 1]
+        ])
 
     # Track x, y, theta, vx, vy, omega
-    C = np.eye(8)
+    # C = np.eye(8)
+    C = np.eye(NUM_STATES)
 
-    Qu = np.diag([50, 50, 20, 5, 5, 5, 0.1, 0.1])
-    Ru = np.diag([1.0, 1.0, 0.5])
+    Qu = np.diag([50, 50, 20, 2, 2, 0.5])
+    Ru = np.diag([4.0, 4.0, 2.5])
 
     mpc = MPC_Controller(p, m, A, B, C, Qu, Ru)
 
     # Robot
-    robot = Robot(np.array([1, 1 , 0, 0, 0, 0, 0, 0]))
+    robot = Robot(np.array([1, 1 , 0, 0, 0, 0]))
     U_prev = np.zeros(3)
 
     # Logs
@@ -163,7 +164,15 @@ if __name__ == "__main__":
 
     t = np.arange(len(X_log)) * DT
 
-    fig, axs = plt.subplots(6, 1, sharex=True, figsize=(8, 10))
+    X_ref = align_ref(X_log, X_ref)
+
+    pos_error = np.linalg.norm(
+    X_log[:, 0:2] - X_ref[:, 0:2], axis=1)
+
+
+
+
+    fig, axs = plt.subplots(3, 1, sharex=True, figsize=(8, 10))
 
     axs[0].plot(t, X_log[:, 0], label="x")
     axs[0].plot(t, X_ref[:len(t), 0], '--', label="x_ref")
@@ -175,27 +184,38 @@ if __name__ == "__main__":
     axs[1].legend()
     axs[1].grid()
 
-    axs[2].plot(t, X_log[:, 2], label="θ")
-    axs[2].plot(t, X_ref[:len(t), 2], '--', label="θ_ref")
+    axs[2].plot(t, pos_error, label="error")
     axs[2].legend()
     axs[2].grid()
 
-    axs[3].plot(t, X_log[:, 3], label="vx")
-    axs[3].plot(t, X_ref[:len(t), 3], '--', label="vx_ref")
+    axs[2].set_xlabel("Time [s]")
+    plt.show()
+
+
+
+
+
+    fig, axs = plt.subplots(4, 1, sharex=True, figsize=(8, 10))
+
+    axs[0].plot(t, X_log[:, 2], label="θ")
+    axs[0].plot(t, X_ref[:len(t), 2], '--', label="θ_ref")
+    axs[0].legend()
+    axs[0].grid()
+
+    axs[1].plot(t, X_log[:, 3], label="vx")
+    axs[1].plot(t, X_ref[:len(t), 3], '--', label="vx_ref")
+    axs[1].legend()
+    axs[1].grid()
+
+    axs[2].plot(t, X_log[:, 4], label="vy")
+    axs[2].plot(t, X_ref[:len(t), 4], '--', label="vy_ref")
+    axs[2].legend()
+    axs[2].grid()
+
+    axs[3].plot(t, X_log[:, 5], label="ω")
+    axs[3].plot(t, X_ref[:len(t), 5], '--', label="ω_ref")
     axs[3].legend()
     axs[3].grid()
-
-    axs[4].plot(t, X_log[:, 4], label="vy")
-    axs[4].plot(t, X_ref[:len(t), 4], '--', label="vy_ref")
-    axs[4].legend()
-    axs[4].grid()
-
-    axs[5].plot(t, X_log[:, 5], label="ω")
-    axs[5].plot(t, X_ref[:len(t), 5], '--', label="ω_ref")
-    axs[5].legend()
-    axs[5].grid()
-
-
 
     axs[3].set_xlabel("Time [s]")
     plt.show()
