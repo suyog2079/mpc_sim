@@ -94,7 +94,7 @@ if __name__ == "__main__":
     # MPC
     # -------------------------
     p = 10
-    m = 10
+    m = 5 
 
     Qu = np.diag([50, 50, 20, 2, 2, 0.5])
     Ru = np.diag([4.0, 4.0, 2.5])
@@ -186,7 +186,7 @@ if __name__ == "__main__":
     plt.xlabel("x")
     plt.ylabel("y")
     plt.title("Path tracking")
-    plt.savefig("path_tracking.png", dpi=300)
+    plt.savefig("figures/path_tracking.png", dpi=300)
     plt.show()
 
     # ---- Position error ----
@@ -211,7 +211,7 @@ if __name__ == "__main__":
     axs[2].grid()
 
     axs[2].set_xlabel("Time [s]")
-    fig.savefig("position_error.png", dpi=300)
+    fig.savefig("figures/position_error.png", dpi=300)
     plt.show()
 
     # ---- State tracking ----
@@ -227,7 +227,7 @@ if __name__ == "__main__":
         ax.grid()
 
     axs[-1].set_xlabel("Time [s]")
-    fig.savefig("state_tracking.png", dpi=300)
+    fig.savefig("figures/state_tracking.png", dpi=300)
     plt.show()
 
     # ---- KF estimation error ----
@@ -238,6 +238,6 @@ if __name__ == "__main__":
     plt.legend()
     plt.grid()
     plt.title("Kalman filter estimation error")
-    plt.savefig("kf_error.png", dpi=300)
+    plt.savefig("figures/kf_error.png", dpi=300)
     plt.show()
 
