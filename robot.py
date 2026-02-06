@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 MAX_ACC = 2 
-MAX_YAW_ACC = 0.1
+MAX_YAW_ACC = 0.4
 DT = 0.1
 NUM_STATES = 6
 NUM_INPUTS = 3
@@ -33,7 +33,7 @@ class Robot:
     def update(self, input):
 
         # adding noise to the input
-        noise = np.random.multivariate_normal(np.zeros(3), np.diag([0.01, 0.01, 0.001]), size=1).flatten()
+        noise = np.random.multivariate_normal(np.zeros(3), np.diag([0.001, 0.001, 0.00001]), size=1).flatten()
         input = input + noise
 
 
@@ -96,8 +96,9 @@ class Robot:
 # I have introduced some gaussian noise
     def observe(self):
         # noise = np.random.multivariate_normal(np.zeros(8), np.diag([0.01, 0.01, 0.001, 0.01, 0.01, 0.001, 0.001, 0.001]), size=1).flatten()
-        noise = np.random.multivariate_normal(np.zeros(NUM_STATES), np.diag([0.01, 0.01, 0.001, 0.01, 0.01, 0.001]), size=1).flatten()
+        noise = np.random.multivariate_normal(np.zeros(NUM_STATES), np.diag([0.001, 0.001, 0.00001, 0.001, 0.001, 0.00001]), size=1).flatten()
         observation = self.X + noise
+        observation = self.X
 
         return observation 
 

@@ -4,9 +4,9 @@ import matplotlib.patches as patches
 
 def curvature(s):
     return (
-        0.05                       # baseline bend
-        + 0.02 * np.sin(0.5 * s)*s**2   # smooth oscillation
-        + 0.01 * np.sin(2.0 * s)*s   # tighter wiggles
+        0.05                       
+        + 0.02 * np.sin(0.5 * s)*s**2   
+        + 0.01 * np.sin(2.0 * s)*s   
     )
 
 def generate_path_curvature(x, y, N=150, ds=0.1):

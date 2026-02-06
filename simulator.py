@@ -10,7 +10,7 @@ def align_ref(X_log, X_ref):
     return X_ref[:T]
 
 
-def build_reference_from_path(path, v_avg=2.0):
+def build_reference_from_path(path, v_avg=3.0):
     """
     Given path (N,2), returns reference trajectory
     X_ref: (N, 8)
