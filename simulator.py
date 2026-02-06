@@ -81,7 +81,7 @@ if __name__ == "__main__":
     X_ref = interpolate_reference(X_ref, factor=4)
 
     # MPC parameters
-    p = 20
+    p = 10
     m = 10 
 
     # defining state transition matrix 
@@ -156,6 +156,7 @@ if __name__ == "__main__":
     plt.xlabel("x")
     plt.ylabel("y")
     plt.title("Path tracking")
+    plt.savefig('path_tracking.png', dpi=300)
     plt.show()
 
     # -----------------------------
@@ -189,7 +190,9 @@ if __name__ == "__main__":
     axs[2].grid()
 
     axs[2].set_xlabel("Time [s]")
+    fig.savefig('position_error.png', dpi=300)
     plt.show()
+
 
 
 
@@ -218,5 +221,6 @@ if __name__ == "__main__":
     axs[3].grid()
 
     axs[3].set_xlabel("Time [s]")
+    fig.savefig('state_tracking.png', dpi=300)
     plt.show()
 
