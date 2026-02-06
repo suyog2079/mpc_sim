@@ -25,9 +25,20 @@ def angle_wrap(angle):
     return angle
 
 class Robot:
-    def __init__(self, _X):
+    def __init__(self, _X, _A, _B, _C):
+        """
+
+        Args:
+            _X (): Initial state vector [x, y, theta, vx, vy, omega]
+            _A (): State transition matrix
+            _B (): Control input matrix
+            _C (): Measurement matrix
+        """
         self.X = _X 
         self.prev_X = np.zeros_like(_X)
+        self.A = _A
+        self.B = _B
+        self.C = _C
 
 # simulate robot motion based on inputs.
     def update(self, input):
@@ -36,76 +47,49 @@ class Robot:
         noise = np.random.multivariate_normal(np.zeros(3), np.diag([0.001, 0.001, 0.00001]), size=1).flatten()
         input = input + noise
 
-
-        # defining state transition matrix 
-        # A = np.array([
-        #     [1, 0, 0, DT, 0, 0, 1/2 * DT**2, 0],
-        #     [0, 1, 0, 0, DT, 0, 0, 1/2 * DT**2],
-        #     [0, 0, 1, 0, 0, DT, 0, 0],
-        #     [0, 0, 0, 1, 0, 0, DT, 0],
-        #     [0, 0, 0, 0, 1, 0 ,0, DT],
-        #     [0, 0, 0, 0, 0, 1, 0, 0],
-        #     [0, 0, 0, 0, 0, 0, 1, 0],
-        #     [0, 0, 0, 0, 0, 0, 0, 1]
-        #               ])
-        #
-        # # defining control input matrix
-        # B = np.array([
-        #     [ 0, 0, 0],
-        #     [ 0, 0, 0],
-        #     [ 0, 0, 0],
-        #     [ 1, 0, 0],
-        #     [ 0, 1, 0],
-        #     [ 0, 0, 1],
-        #     [ 0, 0, 0],
-        #     [ 0, 0, 0],
-        #     ])
-
-        # defining state transition matrix 
-        A = np.array([
-            [1, 0, 0, DT, 0, 0],
-            [0, 1, 0, 0, DT, 0],
-            [0, 0, 1, 0, 0, DT],
-            [0, 0, 0, 1, 0, 0],
-            [0, 0, 0, 0, 1, 0],
-            [0, 0, 0, 0, 0, 1]
-            ])
-
-        # defining control input matrix
-        B = np.array([
-            [ 0, 0, 0],
-            [ 0, 0, 0],
-            [ 0, 0, 0],
-            [ 1, 0, 0],
-            [ 0, 1, 0],
-            [ 0, 0, 1]
-            ])
-
         # implement acceleration limits 
-        self.X = A @ self.X + B @ input
-        self.X[3] = acceleration_limit(self.X[3], self.prev_X[3])
-        self.X[4] = acceleration_limit(self.X[4], self.prev_X[4])
-        self.X[5] = yaw_acceleration_limit(self.X[5], self.prev_X[5])
+        self.X = self.A @ self.X + self.B @ input
+        # self.X[3] = acceleration_limit(self.X[3], self.prev_X[3])
+        # self.X[4] = acceleration_limit(self.X[4], self.prev_X[4])
+        # self.X[5] = yaw_acceleration_limit(self.X[5], self.prev_X[5])
 
         # implement angle wrap for yaw
-        self.X[2] = angle_wrap(self.X[2])
+        # self.X[2] = angle_wrap(self.X[2])
 
         self.prev_X = self.X.copy()
 
 
 # I have introduced some gaussian noise
     def observe(self):
-        # noise = np.random.multivariate_normal(np.zeros(8), np.diag([0.01, 0.01, 0.001, 0.01, 0.01, 0.001, 0.001, 0.001]), size=1).flatten()
-        noise = np.random.multivariate_normal(np.zeros(NUM_STATES), np.diag([0.001, 0.001, 0.00001, 0.001, 0.001, 0.00001]), size=1).flatten()
-        observation = self.X + noise
-        observation = self.X
+        noise = np.random.multivariate_normal(np.zeros(6), np.diag([0.001, 0.001, 0.0001, 0.001, 0.001, 0.0001]), size=1).flatten()
+        observation = self.C @ self.X
+
+        observation = observation + noise
 
         return observation 
 
 
 if __name__ == "__main__":
     xs, ys = [], []
-    robot = Robot(np.zeros(8))
+    robot = Robot(np.zeros(6),
+                  np.array([
+                    [1, 0, 0, DT, 0, 0],
+                    [0, 1, 0, 0, DT, 0],
+                    [0, 0, 1, 0, 0, DT],
+                    [0, 0, 0, 1, 0, 0],
+                    [0, 0, 0, 0, 1, 0],
+                    [0, 0, 0, 0, 0, 1]
+                    ]),
+                  np.array([ #B
+                    [0, 0, 0],
+                    [0, 0, 0],
+                    [0, 0, 0],
+                    [1, 0, 0],
+                    [0, 1, 0],
+                    [0, 0, 1]
+                      ]),
+                  np.eye(6) #C
+                  )
     for i in range(100):
         robot.update(np.array([2.0, 2.0, 0], dtype=float))
         observation = robot.observe()

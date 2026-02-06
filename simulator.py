@@ -1,20 +1,21 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from path_gen import generate_path_curvature, plot_path
+from path_gen import generate_path_curvature
 from robot import Robot, DT, NUM_STATES
 from controller import MPC_Controller
+from kalman_filter import KalmanFilter
+
+
+# --------------------------------------------------
+# Helpers
+# --------------------------------------------------
 
 def align_ref(X_log, X_ref):
-    T = X_log.shape[0]
-    return X_ref[:T]
+    return X_ref[:X_log.shape[0]]
 
 
 def build_reference_from_path(path, v_avg=3.0):
-    """
-    Given path (N,2), returns reference trajectory
-    X_ref: (N, 8)
-    """
     N = path.shape[0]
 
     dx = np.gradient(path[:, 0])
@@ -23,21 +24,12 @@ def build_reference_from_path(path, v_avg=3.0):
     ds = np.sqrt(dx**2 + dy**2)
     ds[ds < 1e-6] = 1e-6
 
-    # Tangent direction
-    theta = np.arctan2(dy, dx)
-    np.unwrap(theta)
+    theta = np.unwrap(np.arctan2(dy, dx))
 
-    # Velocity components
     vx = v_avg * dx / ds
     vy = v_avg * dy / ds
 
-    # Angular velocity
-    dtheta = np.gradient(theta)
-    omega = dtheta / DT
-
-    # Accelerations (reference)
-    ax = np.gradient(vx) / DT
-    ay = np.gradient(vy) / DT
+    omega = np.gradient(theta) / DT
 
     X_ref = np.zeros((N, NUM_STATES))
     X_ref[:, 0] = path[:, 0]
@@ -46,16 +38,11 @@ def build_reference_from_path(path, v_avg=3.0):
     X_ref[:, 3] = vx
     X_ref[:, 4] = vy
     X_ref[:, 5] = omega
-    # X_ref[:, 6] = ax
-    # X_ref[:, 7] = ay
 
     return X_ref
 
 
-def interpolate_reference(X_ref, factor=5):
-    """
-    Increase resolution to match controller DT
-    """
+def interpolate_reference(X_ref, factor=4):
     N, nx = X_ref.shape
     t = np.arange(N)
     t_fine = np.linspace(0, N - 1, N * factor)
@@ -67,24 +54,22 @@ def interpolate_reference(X_ref, factor=5):
     return X_ref_fine
 
 
-# -----------------------------
+# --------------------------------------------------
 # Main simulation
-# -----------------------------
+# --------------------------------------------------
 
 if __name__ == "__main__":
 
-    # Generate path
-    path = generate_path_curvature(1,1)
-
-    # Reference trajectory
+    # -------------------------
+    # Path + reference
+    # -------------------------
+    path = generate_path_curvature(1, 1)
     X_ref = build_reference_from_path(path, v_avg=2.0)
     X_ref = interpolate_reference(X_ref, factor=4)
 
-    # MPC parameters
-    p = 10
-    m = 10 
-
-    # defining state transition matrix 
+    # -------------------------
+    # System matrices
+    # -------------------------
     A = np.array([
         [1, 0, 0, DT, 0, 0],
         [0, 1, 0, 0, DT, 0],
@@ -92,61 +77,106 @@ if __name__ == "__main__":
         [0, 0, 0, 1, 0, 0],
         [0, 0, 0, 0, 1, 0],
         [0, 0, 0, 0, 0, 1]
-        ])
+    ])
 
-    # defining control input matrix
     B = np.array([
-        [ 0, 0, 0],
-        [ 0, 0, 0],
-        [ 0, 0, 0],
-        [ 1, 0, 0],
-        [ 0, 1, 0],
-        [ 0, 0, 1]
-        ])
+        [0, 0, 0],
+        [0, 0, 0],
+        [0, 0, 0],
+        [1, 0, 0],
+        [0, 1, 0],
+        [0, 0, 1]
+    ])
 
-    # Track x, y, theta, vx, vy, omega
-    # C = np.eye(8)
     C = np.eye(NUM_STATES)
+
+    # -------------------------
+    # MPC
+    # -------------------------
+    p = 10
+    m = 10
 
     Qu = np.diag([50, 50, 20, 2, 2, 0.5])
     Ru = np.diag([4.0, 4.0, 2.5])
 
     mpc = MPC_Controller(p, m, A, B, C, Qu, Ru)
 
+    # -------------------------
     # Robot
-    robot = Robot(np.array([1, 1 , 0, 0, 0, 0]))
+    # -------------------------
+    robot = Robot(
+        _X=np.array([1, 1, 0, 0, 0, 0], dtype=float),
+        _A=A,
+        _B=B,
+        _C=C
+    )
+
+    # -------------------------
+    # Kalman Filter
+    # -------------------------
+    input_noise_cov = np.diag([0.001, 0.001, 0.00001])
+    Q_kf = B @ input_noise_cov @ B.T
+
+    R_kf = np.diag([0.001, 0.001, 0.0001, 0.001, 0.001, 0.0001])
+
+    kf = KalmanFilter(
+        _A=A,
+        _B=B,
+        _C=C,
+        _X=robot.X.copy(),
+        _P=np.eye(NUM_STATES),
+        _Q=Q_kf,
+        _R=R_kf
+    )
+
+    # -------------------------
+    # Logs
+    # -------------------------
+    X_log = []
+    X_hat_log = []
+    U_log = []
+
     U_prev = np.zeros(3)
 
-    # Logs
-    X_log = []
-    U_log = []
-    U_ref_log = []
-
+    # -------------------------
     # Simulation loop
+    # -------------------------
     for k in range(len(X_ref) - p):
 
-        X_k = robot.observe()
+        # Measurement
+        Z_k = robot.observe()
 
+        # Kalman filter
+        kf.predict(U_prev)
+        kf.update(Z_k)
+        X_hat = kf.state_estimate()
+
+        # MPC
         Y_ref = X_ref[k:k + p].reshape(-1)
+        U_k = mpc.control_output(X_hat, U_prev, Y_ref)
 
-        U_k = mpc.control_output(X_k, U_prev, Y_ref)
-        # U_k = np.zeros(3)
-
+        # Plant update
         robot.update(U_k)
 
+        # Logs
         X_log.append(robot.X.copy())
+        X_hat_log.append(X_hat.copy())
         U_log.append(U_k.copy())
-        U_ref_log.append(X_ref[k, 6:9] if X_ref.shape[1] >= 9 else np.zeros(3))
 
         U_prev = U_k
 
     X_log = np.array(X_log)
+    X_hat_log = np.array(X_hat_log)
     U_log = np.array(U_log)
 
-    # -----------------------------
-    # Plot path vs trajectory
-    # -----------------------------
+    # -------------------------
+    # Plots
+    # -------------------------
 
+    t = np.arange(len(X_log)) * DT
+    X_ref = align_ref(X_log, X_ref)
+
+    # ---- Path tracking ----
     plt.figure()
     plt.plot(path[:, 0], path[:, 1], 'k--', label="Reference path")
     plt.plot(X_log[:, 0], X_log[:, 1], 'r', label="Robot trajectory")
@@ -156,71 +186,58 @@ if __name__ == "__main__":
     plt.xlabel("x")
     plt.ylabel("y")
     plt.title("Path tracking")
-    plt.savefig('path_tracking.png', dpi=300)
+    plt.savefig("path_tracking.png", dpi=300)
     plt.show()
 
-    # -----------------------------
-    # State plots
-    # -----------------------------
-
-    t = np.arange(len(X_log)) * DT
-
-    X_ref = align_ref(X_log, X_ref)
-
+    # ---- Position error ----
     pos_error = np.linalg.norm(
-    X_log[:, 0:2] - X_ref[:, 0:2], axis=1)
-
-
-
+        X_log[:, 0:2] - X_ref[:, 0:2], axis=1
+    )
 
     fig, axs = plt.subplots(3, 1, sharex=True, figsize=(8, 10))
 
     axs[0].plot(t, X_log[:, 0], label="x")
-    axs[0].plot(t, X_ref[:len(t), 0], '--', label="x_ref")
+    axs[0].plot(t, X_ref[:, 0], '--', label="x_ref")
     axs[0].legend()
     axs[0].grid()
 
     axs[1].plot(t, X_log[:, 1], label="y")
-    axs[1].plot(t, X_ref[:len(t), 1], '--', label="y_ref")
+    axs[1].plot(t, X_ref[:, 1], '--', label="y_ref")
     axs[1].legend()
     axs[1].grid()
 
-    axs[2].plot(t, pos_error, label="error")
+    axs[2].plot(t, pos_error, label="position error")
     axs[2].legend()
     axs[2].grid()
 
     axs[2].set_xlabel("Time [s]")
-    fig.savefig('position_error.png', dpi=300)
+    fig.savefig("position_error.png", dpi=300)
     plt.show()
 
-
-
-
-
-
+    # ---- State tracking ----
     fig, axs = plt.subplots(4, 1, sharex=True, figsize=(8, 10))
 
-    axs[0].plot(t, X_log[:, 2], label="θ")
-    axs[0].plot(t, X_ref[:len(t), 2], '--', label="θ_ref")
-    axs[0].legend()
-    axs[0].grid()
+    labels = ["θ", "vx", "vy", "ω"]
+    idxs = [2, 3, 4, 5]
 
-    axs[1].plot(t, X_log[:, 3], label="vx")
-    axs[1].plot(t, X_ref[:len(t), 3], '--', label="vx_ref")
-    axs[1].legend()
-    axs[1].grid()
+    for ax, idx, label in zip(axs, idxs, labels):
+        ax.plot(t, X_log[:, idx], label=label)
+        ax.plot(t, X_ref[:, idx], '--', label=f"{label}_ref")
+        ax.legend()
+        ax.grid()
 
-    axs[2].plot(t, X_log[:, 4], label="vy")
-    axs[2].plot(t, X_ref[:len(t), 4], '--', label="vy_ref")
-    axs[2].legend()
-    axs[2].grid()
+    axs[-1].set_xlabel("Time [s]")
+    fig.savefig("state_tracking.png", dpi=300)
+    plt.show()
 
-    axs[3].plot(t, X_log[:, 5], label="ω")
-    axs[3].plot(t, X_ref[:len(t), 5], '--', label="ω_ref")
-    axs[3].legend()
-    axs[3].grid()
-
-    axs[3].set_xlabel("Time [s]")
-    fig.savefig('state_tracking.png', dpi=300)
+    # ---- KF estimation error ----
+    plt.figure()
+    plt.plot(t, X_log[:, 0] - X_hat_log[:, 0], label="x error")
+    plt.plot(t, X_log[:, 1] - X_hat_log[:, 1], label="y error")
+    plt.plot(t, X_log[:, 2] - X_hat_log[:, 2], label="θ error")
+    plt.legend()
+    plt.grid()
+    plt.title("Kalman filter estimation error")
+    plt.savefig("kf_error.png", dpi=300)
     plt.show()
 
